@@ -1,0 +1,1 @@
+-- SQL script to create views 
