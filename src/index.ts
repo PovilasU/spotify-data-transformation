@@ -7,7 +7,7 @@ import {
   processCSV,
 } from "./transformer";
 
-async function runTransformation(): Promise<void> {
+export async function runTransformation(): Promise<void> {
   try {
     // Process tracks.csv
     const trackFilter = new FilterTransform({
