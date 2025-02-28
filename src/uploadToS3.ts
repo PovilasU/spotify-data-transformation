@@ -8,6 +8,9 @@ import { createLogger, format, transports } from "winston";
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 dotenv.config();
 
+// Get the current date in YYYY-MM-DD format for log file naming.
+const currentDate = new Date().toISOString().slice(0, 10);
+
 // Set up Winston logger for both console and file logging.
 const logger = createLogger({
   level: "info",
@@ -15,7 +18,13 @@ const logger = createLogger({
   transports: [
     new transports.Console(),
     new transports.File({
-      filename: path.join(__dirname, "..", "logs", "error.log"),
+      // Using a date-stamped filename: app-error-YYYY-MM-DD.log
+      filename: path.join(
+        __dirname,
+        "..",
+        "logs",
+        `app-error-${currentDate}.log`
+      ),
     }),
   ],
 });
