@@ -2,35 +2,94 @@ import AWS from "aws-sdk";
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
+import { createLogger, format, transports } from "winston";
+
+// Load environment variables from .env file (assumed one level up)
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 dotenv.config();
 
-// Load AWS credentials from .env
-const s3 = new AWS.S3({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION,
+// Set up Winston logger for both console and file logging.
+const logger = createLogger({
+  level: "info",
+  format: format.combine(format.timestamp(), format.json()),
+  transports: [
+    new transports.Console(),
+    new transports.File({
+      filename: path.join(__dirname, "..", "logs", "error.log"),
+    }),
+  ],
 });
 
-const filePath = path.join(__dirname, "..", "data", "transformedTracks.csv");
-const bucketName = process.env.S3_BUCKET_NAME || "";
+// Validate required environment variables.
+const { AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, S3_BUCKET_NAME } =
+  process.env;
+if (
+  !AWS_ACCESS_KEY_ID ||
+  !AWS_SECRET_ACCESS_KEY ||
+  !AWS_REGION ||
+  !S3_BUCKET_NAME
+) {
+  logger.error(
+    "Missing one or more required environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, S3_BUCKET_NAME"
+  );
+  process.exit(1);
+}
 
-async function uploadFileToS3() {
+// Set up AWS S3 client using environment variables.
+const s3 = new AWS.S3({
+  accessKeyId: AWS_ACCESS_KEY_ID,
+  secretAccessKey: AWS_SECRET_ACCESS_KEY,
+  region: AWS_REGION,
+});
+
+const bucketName = S3_BUCKET_NAME;
+
+// Helper function to upload a file to S3.
+async function uploadFileToS3(filePath: string, s3Key: string): Promise<void> {
   try {
-    const fileContent = fs.readFileSync(filePath);
+    // Validate the file exists.
+    if (!fs.existsSync(filePath)) {
+      logger.error(`File not found: ${filePath}`);
+      return;
+    }
 
+    const fileContent = fs.readFileSync(filePath);
     const params = {
       Bucket: bucketName,
-      Key: "transformedTracks.csv",
+      Key: s3Key,
       Body: fileContent,
       ContentType: "text/csv",
     };
 
     const result = await s3.upload(params).promise();
-    console.log("File uploaded successfully to S3:", result.Location);
+    logger.info(
+      `File "${s3Key}" uploaded successfully to S3: ${result.Location}`
+    );
   } catch (error) {
-    console.error("Error uploading file:", error);
+    logger.error(`Error uploading file "${s3Key}": ${error}`);
   }
 }
 
-uploadFileToS3();
+// Define local paths for the transformed CSV files.
+const transformedTracksPath = path.join(
+  __dirname,
+  "..",
+  "data",
+  "transformedTracks.csv"
+);
+const transformedArtistsPath = path.join(
+  __dirname,
+  "..",
+  "data",
+  "transformedArtists.csv"
+);
+
+// Run uploads for both files.
+async function runUploads() {
+  await uploadFileToS3(transformedTracksPath, "transformedTracks.csv");
+  await uploadFileToS3(transformedArtistsPath, "transformedArtists.csv");
+}
+
+runUploads().catch((err) => {
+  logger.error(`Unhandled error: ${err}`);
+});
