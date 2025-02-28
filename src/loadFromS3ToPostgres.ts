@@ -1,6 +1,7 @@
 import AWS from "aws-sdk";
 import { Client } from "pg";
 import path from "path";
+import fs from "fs";
 import dotenv from "dotenv";
 import { parse } from "csv-parse/sync"; // Import parse from the sync version of csv-parse
 import cliProgress from "cli-progress";
@@ -9,19 +10,23 @@ import { createLogger, format, transports } from "winston";
 // Load environment variables from .env file (assumed one level up)
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 
-// Configure Winston logger
+// Get the current date in YYYY-MM-DD format for log file naming.
+const currentDate = new Date().toISOString().slice(0, 10);
+
+// Set up Winston logger for both console and file logging.
 const logger = createLogger({
   level: "info",
-  format: format.combine(
-    format.timestamp(),
-    format.printf(
-      ({ timestamp, level, message }) => `${timestamp} [${level}] ${message}`
-    )
-  ),
+  format: format.combine(format.timestamp(), format.json()),
   transports: [
     new transports.Console(),
     new transports.File({
-      filename: path.join(__dirname, "..", "logs", "app.log"),
+      // Using a date-stamped filename: app-error-YYYY-MM-DD.log
+      filename: path.join(
+        __dirname,
+        "..",
+        "logs",
+        `app-error-${currentDate}.log`
+      ),
     }),
   ],
 });
@@ -33,9 +38,10 @@ const s3 = new AWS.S3({
   region: process.env.AWS_REGION, // Example: 'us-east-1'
 });
 
-// S3 bucket and file key
+// S3 bucket and file keys
 const bucketName = process.env.S3_BUCKET_NAME || "";
-const fileKey = "transformedTracks.csv"; // The file to be downloaded from S3
+const tracksFileKey = "transformedTracks.csv";
+const artistsFileKey = "transformedArtists.csv";
 
 /**
  * Ensure the target PostgreSQL database exists.
@@ -76,12 +82,13 @@ async function ensureDatabaseExists(targetDb: string): Promise<void> {
 
 /**
  * Download CSV file from S3 and return its content as a string.
+ * @param s3Key - The S3 key of the file to download.
  */
-async function downloadCSVFromS3(): Promise<string> {
+async function downloadCSVFromS3(s3Key: string): Promise<string> {
   try {
     const params: AWS.S3.Types.GetObjectRequest = {
       Bucket: bucketName,
-      Key: fileKey,
+      Key: s3Key,
     };
     const data = await s3.getObject(params).promise();
     if (!data.Body) {
@@ -95,9 +102,14 @@ async function downloadCSVFromS3(): Promise<string> {
 }
 
 /**
- * Main function that downloads the CSV from S3 and loads it into PostgreSQL.
+ * Load a CSV file (from S3) into a PostgreSQL table.
+ * @param s3Key - The S3 key for the CSV file.
+ * @param tableName - The target table name.
  */
-async function loadFromS3ToPostgres(): Promise<void> {
+async function loadCSVIntoTable(
+  s3Key: string,
+  tableName: string
+): Promise<void> {
   try {
     const targetDb = process.env.PG_DATABASE;
     if (!targetDb) {
@@ -105,10 +117,10 @@ async function loadFromS3ToPostgres(): Promise<void> {
       process.exit(1);
     }
 
-    // Ensure the target database exists
+    // Ensure the target database exists.
     await ensureDatabaseExists(targetDb);
 
-    // Connect to the target database
+    // Connect to the target database.
     const pgClient = new Client({
       host: process.env.PG_HOST,
       port: parseInt(process.env.PG_PORT || "5432"),
@@ -119,8 +131,8 @@ async function loadFromS3ToPostgres(): Promise<void> {
     await pgClient.connect();
     logger.info(`Connected to PostgreSQL database "${targetDb}"`);
 
-    // Download CSV file from S3
-    const fileContent = await downloadCSVFromS3();
+    // Download CSV file from S3.
+    const fileContent = await downloadCSVFromS3(s3Key);
 
     // Parse CSV file (using headers as keys)
     const records = parse(fileContent, {
@@ -128,48 +140,58 @@ async function loadFromS3ToPostgres(): Promise<void> {
       skip_empty_lines: true,
     });
     if (records.length === 0) {
-      logger.error("CSV file is empty.");
+      logger.error(`CSV file for ${tableName} is empty.`);
+      await pgClient.end();
       return;
     }
 
-    // Use CSV headers from the first record
+    // Use CSV headers from the first record.
     const headers = Object.keys(records[0]);
 
     // Create table with columns as TEXT (if it doesn't exist)
     const columnsDefinition = headers.map((col) => `"${col}" TEXT`).join(", ");
-    const createTableQuery = `CREATE TABLE IF NOT EXISTS tracks (${columnsDefinition});`;
+    const createTableQuery = `CREATE TABLE IF NOT EXISTS ${tableName} (${columnsDefinition});`;
     await pgClient.query(createTableQuery);
     logger.info(
-      `Ensured table 'tracks' exists with columns: ${headers.join(", ")}`
+      `Ensured table "${tableName}" exists with columns: ${headers.join(", ")}`
     );
 
     // Prepare the INSERT query (using dynamic placeholders)
     const columnsList = headers.map((col) => `"${col}"`).join(", ");
     const placeholders = headers.map((_, i) => `$${i + 1}`).join(", ");
-    const insertQuery = `INSERT INTO tracks (${columnsList}) VALUES (${placeholders})`;
+    const insertQuery = `INSERT INTO ${tableName} (${columnsList}) VALUES (${placeholders})`;
 
-    // Set up the progress bar
+    // Set up the progress bar.
     const progressBar = new cliProgress.SingleBar(
-      { format: "Loading [{bar}] {value}/{total} rows", hideCursor: true },
+      {
+        format: "Loading into " + tableName + " [{bar}] {value}/{total} rows",
+        hideCursor: true,
+      },
       cliProgress.Presets.shades_classic
     );
     progressBar.start(records.length, 0);
 
-    // Insert each record one by one
+    // Insert each record one by one.
     for (const record of records) {
       const values = headers.map((header) => record[header] ?? null);
       await pgClient.query(insertQuery, values);
       progressBar.increment();
     }
     progressBar.stop();
-    logger.info(`Loaded ${records.length} rows into PostgreSQL.`);
+    logger.info(`Loaded ${records.length} rows into table "${tableName}".`);
     await pgClient.end();
     logger.info("Disconnected from PostgreSQL");
   } catch (err) {
-    logger.error("Error during CSV load: " + err);
+    logger.error(`Error during CSV load into table "${tableName}": ${err}`);
   }
 }
 
-loadFromS3ToPostgres().catch((err) => {
+// Run the pipelines to load both tracks and artists CSV files.
+async function runLoads() {
+  await loadCSVIntoTable(tracksFileKey, "tracks");
+  await loadCSVIntoTable(artistsFileKey, "artists");
+}
+
+runLoads().catch((err) => {
   logger.error("Unhandled error: " + err);
 });
