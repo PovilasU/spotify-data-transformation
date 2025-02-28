@@ -23,7 +23,7 @@ const logger = createLogger({
   ],
 });
 
-// Define interfaces for input track rows and output artist IDs.
+// Define interfaces for input track rows and artist rows.
 interface TrackRow {
   name: string;
   duration_ms: string;
@@ -33,8 +33,9 @@ interface TrackRow {
   [key: string]: any;
 }
 
-interface ArtistId {
+interface ArtistRow {
   id: string;
+  [key: string]: any;
 }
 
 /**
@@ -46,16 +47,16 @@ function parseReleaseDate(dateStr: string): {
   month: string;
   day: string;
 } {
-  // Remove non-ASCII characters (BOM, zero-width spaces) and trim.
+  // Remove non-ASCII characters and trim.
   let cleaned = dateStr.replace(/[^\x20-\x7E]+/g, "").trim();
 
-  // Format: "YYYY-MM-DD" (e.g., "1929-01-12")
+  // Format: "YYYY-MM-DD"
   if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
     const [year, month, day] = cleaned.split("-");
     return { year, month, day };
   }
 
-  // Format: "DD/MM/YYYY" (e.g., "22/02/1929")
+  // Format: "DD/MM/YYYY"
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleaned)) {
     const [dd, mm, yyyy] = cleaned.split("/");
     return { year: yyyy, month: mm, day: dd };
@@ -90,7 +91,7 @@ function transformDanceability(value: string | undefined): string {
  * - Filters out tracks with no name or duration less than the minimum.
  * - Parses the id_artists field and collects unique artist IDs.
  * - Explodes release_date into separate columns (release_year, release_month, release_day).
- * - Transforms danceability into a string label.
+ * - Transforms danceability into a categorical label.
  */
 class FilterTransform extends Transform {
   public uniqueArtistIds: Set<string> = new Set();
@@ -153,16 +154,53 @@ class FilterTransform extends Transform {
 }
 
 /**
- * Main function to run the transformation pipeline.
+ * Custom transform stream for filtering artists.
+ * Only passes through artists whose id is in the allowed set.
+ */
+class ArtistFilterTransform extends Transform {
+  private allowedArtistIds: Set<string>;
+
+  constructor(allowedArtistIds: Set<string>) {
+    super({ objectMode: true });
+    this.allowedArtistIds = allowedArtistIds;
+  }
+
+  _transform(
+    chunk: any,
+    _encoding: BufferEncoding,
+    callback: TransformCallback
+  ): void {
+    try {
+      const artist = chunk as ArtistRow;
+      if (this.allowedArtistIds.has(artist.id)) {
+        callback(null, artist);
+      } else {
+        callback(); // Skip artist if not in the allowed set.
+      }
+    } catch (error) {
+      logger.error(`Error in ArtistFilterTransform: ${error}`);
+      callback();
+    }
+  }
+}
+
+/**
+ * Main function to run the transformation pipelines.
  */
 async function runTransformation(): Promise<void> {
   const config = {
     inputFile: path.join(__dirname, "../data/tracks.csv"),
+    inputArtistsFile: path.join(__dirname, "../data/artists.csv"),
     outputTracksFile: path.join(__dirname, "../data/transformedTracks.csv"),
-    outputArtistIdsFile: path.join(__dirname, "../data/uniqueArtistIds.csv"),
+    outputArtistsFile: path.join(__dirname, "../data/transformedArtists.csv"),
     minDuration: 60000, // 1 minute in milliseconds.
   };
 
+  let filterTransform: FilterTransform;
+
+  // -------------------------
+  // Process tracks.csv to transform tracks and collect unique artist IDs.
+  // -------------------------
   try {
     // Set up a progress bar based on the input file size.
     const { size: totalBytes } = fs.statSync(config.inputFile);
@@ -172,7 +210,7 @@ async function runTransformation(): Promise<void> {
     );
     progressBar.start(totalBytes, 0);
 
-    // Create a read stream for the input CSV.
+    // Create a read stream for the input tracks CSV.
     const readStream = fs.createReadStream(config.inputFile);
     readStream.on("data", (chunk: Buffer | string) => {
       const length =
@@ -181,13 +219,11 @@ async function runTransformation(): Promise<void> {
     });
 
     // Instantiate the custom transform stream.
-    const filterTransform = new FilterTransform({
-      minDuration: config.minDuration,
-    });
+    filterTransform = new FilterTransform({ minDuration: config.minDuration });
     const csvStringifier = stringify({ header: true });
     const tracksWriteStream = fs.createWriteStream(config.outputTracksFile);
 
-    // Chain the streams using pipeline for robust error handling.
+    // Chain the streams using pipeline.
     await pipeline(
       readStream,
       csvParser(),
@@ -198,34 +234,52 @@ async function runTransformation(): Promise<void> {
     progressBar.stop();
     console.log(`Filtered tracks saved to: ${config.outputTracksFile}`);
   } catch (error) {
-    logger.error(`Error during pipeline processing: ${error}`);
-    console.error("Error during pipeline processing:", error);
+    logger.error(`Error during tracks pipeline processing: ${error}`);
+    console.error("Error during tracks pipeline processing:", error);
     return;
   }
 
-  // Write the unique artist IDs to a separate CSV.
+  // -------------------------
+  // Process artists.csv to filter only artists in uniqueArtistIds.
+  // -------------------------
   try {
-    // In this example, the unique artist IDs were collected during the pipeline.
-    // To preserve them, you may want to refactor so that the FilterTransform instance is accessible here.
-    // For demonstration, we'll assume the uniqueArtistIds set is available from the previous pipeline.
-    // This example reuses the same instance (in a real-world scenario, consider architecting this appropriately).
-    const filterTransform = new FilterTransform({ minDuration: 60000 });
-    // (This is a limitation of this self-contained example.)
-    const uniqueArtistIdsArray: ArtistId[] = Array.from(
+    // Create a read stream for the input artists CSV.
+    const artistsReadStream = fs.createReadStream(config.inputArtistsFile);
+    // Create a write stream for the transformed artists.
+    const artistsWriteStream = fs.createWriteStream(config.outputArtistsFile);
+    // Set up CSV stringifier with header.
+    const artistsStringifier = stringify({ header: true });
+
+    // Create a transform stream to filter artists.
+    const artistFilter = new ArtistFilterTransform(
       filterTransform.uniqueArtistIds
-    ).map((id) => ({ id }));
-    stringify(uniqueArtistIdsArray, { header: true }, (err, output) => {
-      if (err) {
-        logger.error(`Error stringifying artist IDs: ${err}`);
-        console.error("Error stringifying artist IDs:", err);
-        return;
-      }
-      fs.writeFileSync(config.outputArtistIdsFile, output);
-      console.log(`Unique artist IDs saved to: ${config.outputArtistIdsFile}`);
+    );
+
+    // Optionally, set up a progress bar for the artists file.
+    const { size: artistsTotalBytes } = fs.statSync(config.inputArtistsFile);
+    const artistsProgressBar = new cliProgress.SingleBar(
+      {},
+      cliProgress.Presets.shades_classic
+    );
+    artistsProgressBar.start(artistsTotalBytes, 0);
+    artistsReadStream.on("data", (chunk: Buffer | string) => {
+      const length =
+        typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.length;
+      artistsProgressBar.increment(length);
     });
+
+    await pipeline(
+      artistsReadStream,
+      csvParser(),
+      artistFilter,
+      artistsStringifier,
+      artistsWriteStream
+    );
+    artistsProgressBar.stop();
+    console.log(`Filtered artists saved to: ${config.outputArtistsFile}`);
   } catch (error) {
-    logger.error(`Error writing artist IDs: ${error}`);
-    console.error("Error writing artist IDs:", error);
+    logger.error(`Error during artists pipeline processing: ${error}`);
+    console.error("Error during artists pipeline processing:", error);
   }
 }
 
