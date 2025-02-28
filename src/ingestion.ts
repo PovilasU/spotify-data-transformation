@@ -7,19 +7,24 @@ import { Transform, TransformCallback } from "stream";
 import { pipeline } from "stream/promises";
 import { createLogger, format, transports } from "winston";
 
-// Ensure the logs directory exists.
-const logsDir = path.join(__dirname, "../logs");
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
-}
+// Get the current date in YYYY-MM-DD format for log file naming.
+const currentDate = new Date().toISOString().slice(0, 10);
 
-// Create a Winston logger instance to log errors into ../logs/error.log and the console.
+// Set up Winston logger for both console and file logging.
 const logger = createLogger({
-  level: "error",
+  level: "info",
   format: format.combine(format.timestamp(), format.json()),
   transports: [
-    new transports.File({ filename: path.join(logsDir, "error.log") }),
     new transports.Console(),
+    new transports.File({
+      // Using a date-stamped filename: app-error-YYYY-MM-DD.log
+      filename: path.join(
+        __dirname,
+        "..",
+        "logs",
+        `app-error-${currentDate}.log`
+      ),
+    }),
   ],
 });
 
