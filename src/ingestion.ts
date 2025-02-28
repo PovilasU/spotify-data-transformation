@@ -6,12 +6,11 @@ import cliProgress from "cli-progress";
 import { Transform, TransformCallback } from "stream";
 import { pipeline } from "stream/promises";
 
-// Define TypeScript interfaces for type safety
 interface TrackRow {
   name: string;
   duration_ms: string;
   id_artists: string;
-  // Include other columns as needed
+  release_date?: string;
   [key: string]: any;
 }
 
@@ -19,7 +18,39 @@ interface ArtistId {
   id: string;
 }
 
-// Custom transform stream to filter tracks and collect unique artist IDs
+// Updated date parser to handle "YYYY-MM-DD", "DD/MM/YYYY", and "YYYY"
+function parseReleaseDate(dateStr: string): {
+  year: string;
+  month: string;
+  day: string;
+} {
+  // 1) Remove non-ASCII characters (like BOM or zero-width spaces)
+  let cleaned = dateStr.replace(/[^\x20-\x7E]+/g, "").trim();
+
+  // 2) If it's "YYYY-MM-DD"
+  //    e.g., "1929-01-12" => year="1929", month="01", day="12"
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
+    const [year, month, day] = cleaned.split("-");
+    return { year, month, day };
+  }
+
+  // 3) If it's "DD/MM/YYYY"
+  //    e.g., "22/02/1929" => year="1929", month="02", day="22"
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleaned)) {
+    const [dd, mm, yyyy] = cleaned.split("/");
+    return { year: yyyy, month: mm, day: dd };
+  }
+
+  // 4) If it's just "YYYY"
+  if (/^\d{4}$/.test(cleaned)) {
+    return { year: cleaned, month: "", day: "" };
+  }
+
+  // 5) Otherwise, unknown format => empty
+  return { year: "", month: "", day: "" };
+}
+
+// Transform stream to filter tracks + parse date + collect artist IDs
 class FilterTransform extends Transform {
   public uniqueArtistIds: Set<string> = new Set();
   private minDuration: number;
@@ -35,48 +66,53 @@ class FilterTransform extends Transform {
     callback: TransformCallback
   ) {
     const track = chunk as TrackRow;
-    const name = track.name;
+    const name = track.name?.trim();
     const duration = Number(track.duration_ms);
 
-    // Filter criteria: non-empty name and duration_ms at least minDuration
-    if (name && name.trim() !== "" && duration >= this.minDuration) {
-      // Parse the id_artists field (e.g. "['id1','id2']") into an array
-      let idArtistsArray: string[] = [];
-      if (track.id_artists) {
-        try {
-          const normalized = track.id_artists.replace(/'/g, '"');
-          idArtistsArray = JSON.parse(normalized);
-        } catch (error) {
-          // Fallback: treat the entire string as one ID if parsing fails
-          idArtistsArray = [track.id_artists];
-        }
-      }
-      // Add each trimmed artist ID to the set of unique IDs
-      idArtistsArray.forEach((id) => {
-        const trimmed = id.trim();
-        if (trimmed) {
-          this.uniqueArtistIds.add(trimmed);
-        }
-      });
-      // Pass the record along (without modifying it)
-      callback(null, track);
-    } else {
-      // Filter out the record by not pushing it downstream
-      callback();
+    // Filter: name must be non-empty, duration >= minDuration
+    if (!name || duration < this.minDuration) {
+      return callback();
     }
+
+    // Parse id_artists (e.g. "['id1','id2']")
+    let idArtistsArray: string[] = [];
+    if (track.id_artists) {
+      try {
+        const normalized = track.id_artists.replace(/'/g, '"');
+        idArtistsArray = JSON.parse(normalized);
+      } catch {
+        // Fallback: treat entire string as one ID
+        idArtistsArray = [track.id_artists];
+      }
+    }
+    // Collect unique artist IDs
+    idArtistsArray.forEach((id) => {
+      const trimmed = id.trim();
+      if (trimmed) {
+        this.uniqueArtistIds.add(trimmed);
+      }
+    });
+
+    // Parse release_date
+    const { year, month, day } = parseReleaseDate(track.release_date || "");
+    track.release_year = year;
+    track.release_month = month;
+    track.release_day = day;
+
+    // Pass this record onward
+    callback(null, track);
   }
 }
 
 async function runTransformation() {
-  // Configurable parameters
   const config = {
     inputFile: path.join(__dirname, "../data/tracks.csv"),
     outputTracksFile: path.join(__dirname, "../data/transformedTracks.csv"),
     outputArtistIdsFile: path.join(__dirname, "../data/uniqueArtistIds.csv"),
-    minDuration: 60000, // Minimum duration in ms (1 minute)
+    minDuration: 60000, // 1 minute
   };
 
-  // Get total file size (in bytes) for progress tracking
+  // Track file size for the progress bar
   const { size: totalBytes } = fs.statSync(config.inputFile);
   const progressBar = new cliProgress.SingleBar(
     {},
@@ -84,26 +120,20 @@ async function runTransformation() {
   );
   progressBar.start(totalBytes, 0);
 
-  // Create a read stream for the input CSV
   const readStream = fs.createReadStream(config.inputFile);
-  // Update progress bar based on chunk sizes
   readStream.on("data", (chunk: Buffer | string) => {
     const length =
       typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.length;
     progressBar.increment(length);
   });
 
-  // Create an instance of the filter transform stream
   const filterTransform = new FilterTransform({
     minDuration: config.minDuration,
   });
-
-  // Create a CSV stringifier stream (object mode) for writing filtered tracks
   const csvStringifier = stringify({ header: true });
   const tracksWriteStream = fs.createWriteStream(config.outputTracksFile);
 
   try {
-    // Use Node's pipeline (async/await) to process streams robustly
     await pipeline(
       readStream,
       csvParser(),
@@ -119,8 +149,7 @@ async function runTransformation() {
     return;
   }
 
-  // After the pipeline completes, write unique artist IDs to a separate CSV.
-  // Map the unique IDs to objects with property "id"
+  // Write unique artist IDs
   const uniqueArtistIdsArray: ArtistId[] = Array.from(
     filterTransform.uniqueArtistIds
   ).map((id) => ({ id }));
@@ -134,7 +163,6 @@ async function runTransformation() {
   });
 }
 
-// Run the transformation and catch any errors at the top level
 runTransformation().catch((err) => {
   console.error("Error running transformation:", err);
 });
