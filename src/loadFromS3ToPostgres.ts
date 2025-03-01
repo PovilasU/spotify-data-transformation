@@ -1,3 +1,4 @@
+//loadFromS3ToPostgres.ts
 import AWS from "aws-sdk";
 import { Client } from "pg";
 import path from "path";
@@ -23,10 +24,11 @@ const tracksFileKey = "transformedTracks.csv";
 const artistsFileKey = "transformedArtists.csv";
 
 /**
+ *
  * Ensure the target PostgreSQL database exists.
  * If it doesn't exist, this function creates it.
  */
-async function ensureDatabaseExists(targetDb: string): Promise<void> {
+export async function ensureDatabaseExists(targetDb: string): Promise<void> {
   const adminClient = new Client({
     host: process.env.PG_HOST,
     port: parseInt(process.env.PG_PORT || "5432"),
@@ -63,7 +65,7 @@ async function ensureDatabaseExists(targetDb: string): Promise<void> {
  * Download CSV file from S3 and return its content as a string.
  * @param s3Key - The S3 key of the file to download.
  */
-async function downloadCSVFromS3(s3Key: string): Promise<string> {
+export async function downloadCSVFromS3(s3Key: string): Promise<string> {
   try {
     const params: AWS.S3.Types.GetObjectRequest = {
       Bucket: bucketName,
@@ -85,7 +87,7 @@ async function downloadCSVFromS3(s3Key: string): Promise<string> {
  * @param s3Key - The S3 key for the CSV file.
  * @param tableName - The target table name.
  */
-async function loadCSVIntoTable(
+export async function loadCSVIntoTable(
   s3Key: string,
   tableName: string
 ): Promise<void> {
