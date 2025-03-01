@@ -5,31 +5,10 @@ import fs from "fs";
 import dotenv from "dotenv";
 import { parse } from "csv-parse/sync"; // Import parse from the sync version of csv-parse
 import cliProgress from "cli-progress";
-import { createLogger, format, transports } from "winston";
+import { logger } from "./logger";
 
 // Load environment variables from .env file (assumed one level up)
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
-
-// Get the current date in YYYY-MM-DD format for log file naming.
-const currentDate = new Date().toISOString().slice(0, 10);
-
-// Set up Winston logger for both console and file logging.
-const logger = createLogger({
-  level: "info",
-  format: format.combine(format.timestamp(), format.json()),
-  transports: [
-    new transports.Console(),
-    new transports.File({
-      // Using a date-stamped filename: app-error-YYYY-MM-DD.log
-      filename: path.join(
-        __dirname,
-        "..",
-        "logs",
-        `app-error-${currentDate}.log`
-      ),
-    }),
-  ],
-});
 
 // Set up AWS S3 client
 const s3 = new AWS.S3({
