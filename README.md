@@ -82,9 +82,3 @@ This project involves the ingestion, transformation, and analysis of Spotify sam
     ```sh
     npm run test
     ```
-
-## Additional Information
-
-- Specific technologies and services from the AWS ecosystem (e.g., AWS Lambda) were chosen to complete the task.
-- Best practices for error handling and data validation were considered in the implementation.
-- The solution is well-structured, self-explanatory, and easily maintainable.
