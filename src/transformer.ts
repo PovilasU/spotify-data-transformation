@@ -75,7 +75,6 @@ export class FilterTransform extends Transform {
 
   constructor(options: { minDuration: number }) {
     super({ objectMode: true });
-    console.log("Minimum duration:", options.minDuration);
     this.minDuration = options.minDuration;
   }
 

@@ -5,42 +5,27 @@ import { stringify } from "csv-stringify";
 import cliProgress from "cli-progress";
 import { Transform, TransformCallback } from "stream";
 import { pipeline } from "stream/promises";
-import { createLogger, format, transports } from "winston";
+import { logger } from "./logger";
 
 // Get the current date in YYYY-MM-DD format for log file naming.
 const currentDate = new Date().toISOString().slice(0, 10);
 
-// Set up Winston logger for both console and file logging.
-const logger = createLogger({
-  level: "info",
-  format: format.combine(format.timestamp(), format.json()),
-  transports: [
-    new transports.Console(),
-    new transports.File({
-      // Using a date-stamped filename: app-error-YYYY-MM-DD.log
-      filename: path.join(
-        __dirname,
-        "..",
-        "logs",
-        `app-error-${currentDate}.log`
-      ),
-    }),
-  ],
-});
-
 // Define interfaces for input track rows and artist rows.
 interface TrackRow {
   name: string;
-  duration_ms: string;
-  id_artists: string;
+  duration_ms: number;
+  id_artists: string[];
   release_date?: string;
-  danceability?: string; // Expected to be a numeric string.
+  danceability?: number; // Expected to be a numeric string.
   [key: string]: any;
 }
 
 interface ArtistRow {
   id: string;
-  [key: string]: any;
+  followers: number;
+  genres: string[];
+  name: string;
+  popularity: number;
 }
 
 /**
@@ -81,7 +66,7 @@ function parseReleaseDate(dateStr: string): {
  * [0.5, 0.6] => "Medium"
  * (0.6, 1]  => "High"
  */
-function transformDanceability(value: string | undefined): string {
+function transformDanceability(value: number | undefined): string {
   if (!value) return "";
   const num = Number(value);
   if (isNaN(num)) return "";
@@ -126,11 +111,10 @@ class FilterTransform extends Transform {
       let idArtistsArray: string[] = [];
       if (track.id_artists) {
         try {
-          const normalized = track.id_artists.replace(/'/g, '"');
-          idArtistsArray = JSON.parse(normalized);
+          idArtistsArray = track.id_artists;
         } catch (err) {
           logger.error(`Error parsing id_artists for track "${name}": ${err}`);
-          idArtistsArray = [track.id_artists];
+          idArtistsArray = track.id_artists;
         }
       }
       idArtistsArray.forEach((id) => {
