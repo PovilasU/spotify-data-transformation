@@ -20,7 +20,7 @@ const bucketName = config.aws.bucketName;
  * @param s3Key The key (file name) under which the file is saved in S3.
  * @param retries Number of retry attempts (default is 3).
  */
-async function uploadFileToS3(
+export async function uploadFileToS3(
   filePath: string,
   s3Key: string,
   retries = 3
@@ -68,13 +68,13 @@ async function uploadFileToS3(
 }
 
 // Define local paths for the transformed CSV files.
-const transformedTracksPath = path.join(
+export const transformedTracksPath = path.join(
   __dirname,
   "..",
   "data",
   "transformedTracks.csv"
 );
-const transformedArtistsPath = path.join(
+export const transformedArtistsPath = path.join(
   __dirname,
   "..",
   "data",
@@ -84,7 +84,7 @@ const transformedArtistsPath = path.join(
 /**
  * Runs uploads for both files concurrently.
  */
-async function runUploads() {
+export async function runUploads() {
   try {
     await Promise.all([
       uploadFileToS3(transformedTracksPath, "transformedTracks.csv"),
@@ -95,4 +95,7 @@ async function runUploads() {
   }
 }
 
-runUploads();
+// Only run uploads if this module is executed directly.
+if (require.main === module) {
+  runUploads();
+}
