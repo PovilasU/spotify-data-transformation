@@ -69,8 +69,9 @@ This project involves the ingestion, transformation, and analysis of Spotify sam
    ```typescript
    localTest: process.env.LOCAL_TEST === "false", // change to true if you don't want to load .csv files from AWS S3 but test with local files
    ```
-7. Run the Node.js script to ingest and transform the data:
+7. Run the Node.js script to ingest and transform the data from the `src` folder:
    ```sh
+   cd src
    npx ts-node .\index.ts
    ```
 8. Upload the transformed files to Amazon S3:
