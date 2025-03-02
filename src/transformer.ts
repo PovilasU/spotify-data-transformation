@@ -4,7 +4,7 @@ import { stringify } from "csv-stringify";
 import cliProgress from "cli-progress";
 import { Transform, TransformCallback } from "stream";
 import { pipeline } from "stream/promises";
-import { logger } from "./logger";
+import { logger } from "./utils/logger";
 import { config } from "./config";
 
 // Define interfaces for input track rows and artist rows.

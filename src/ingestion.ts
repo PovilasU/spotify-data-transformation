@@ -5,7 +5,7 @@ import { stringify } from "csv-stringify";
 import cliProgress from "cli-progress";
 import { Transform, TransformCallback } from "stream";
 import { pipeline } from "stream/promises";
-import { logger } from "./logger";
+import { logger } from "./utils/logger";
 
 // Get the current date in YYYY-MM-DD format for log file naming.
 const currentDate = new Date().toISOString().slice(0, 10);

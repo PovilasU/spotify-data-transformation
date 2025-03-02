@@ -1,6 +1,6 @@
 import { Client } from "pg";
 import { config } from "./config";
-import { logger } from "./logger";
+import { logger } from "./utils/logger";
 
 /**
  * Ensures that the target PostgreSQL database exists.

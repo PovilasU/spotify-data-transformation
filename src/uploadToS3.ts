@@ -4,7 +4,7 @@ import fs from "fs";
 import dotenv from "dotenv";
 import { parse } from "csv-parse/sync";
 import cliProgress from "cli-progress";
-import { logger } from "./logger";
+import { logger } from "./utils/logger";
 import { ensureDatabaseExists, getClient } from "./db";
 import { config } from "./config";
 

@@ -2,7 +2,7 @@ import AWS from "aws-sdk";
 import fs from "fs";
 import path from "path";
 import { config } from "./config";
-import { logger } from "./logger";
+import { logger } from "./utils/logger";
 
 const s3 = new AWS.S3({
   accessKeyId: config.aws.accessKeyId,

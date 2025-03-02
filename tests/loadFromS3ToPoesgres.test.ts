@@ -1,6 +1,11 @@
 // tests/loadFromS3ToPostgres.test.ts
 
-import { logger } from "../src/logger";
+import { logger } from "../src/utils/logger";
+
+import { config } from "../src/config/config";
+// import { loadCSVIntoTable } from "../src/services/csvLoader";
+// import { downloadCSVFromS3 } from "../src/services/s3Service";
+// import { ensureDatabaseExists } from "../src/services/dbService";
 
 // --- Set up environment variables for testing ---
 process.env.AWS_ACCESS_KEY_ID = "dummyAccessKey";
@@ -59,11 +64,9 @@ beforeEach(() => {
 });
 
 // --- Import the module under test AFTER mocks are set up ---
-import {
-  downloadCSVFromS3,
-  ensureDatabaseExists,
-  loadCSVIntoTable,
-} from "../src/loadFromS3ToPostgres";
+import { loadCSVIntoTable } from "../src/services/csvLoader";
+import { downloadCSVFromS3 } from "../src/services/s3Service";
+import { ensureDatabaseExists } from "../src/services/dbService";
 
 // --------------------
 // Tests for downloadCSVFromS3
