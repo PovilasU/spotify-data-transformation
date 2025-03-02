@@ -65,25 +65,26 @@ This project involves the ingestion, transformation, and analysis of Spotify sam
    mv .env.txt .env
    ```
 5. Configure AWS S3 and PostgreSQL settings in the `.env` file.
-6. In `src/config.ts`, ensure `localTest` is set to `false` to download files from S3:
+6. Set `LOCAL_TEST=false` in the `.env` file if you want to download files from S3. Set it to `true` to use local files from the `data` folder (useful for testing).
+7. In `src/config.ts`, ensure `localTest` is set to `false` to download files from S3:
    ```typescript
    localTest: process.env.LOCAL_TEST === "false", // change to true if you don't want to load .csv files from AWS S3 but test with local files
    ```
-7. Run the Node.js script to ingest and transform the data from the `src` folder:
+8. Run the Node.js script to ingest and transform the data from the `src` folder:
    ```sh
    cd src
    npx ts-node .\index.ts
    ```
-8. Upload the transformed files to Amazon S3:
+9. Upload the transformed files to Amazon S3:
    ```sh
    npx ts-node .\uploadToS3.ts
    ```
-9. Load the data from S3 to the local PostgreSQL database:
-   ```sh
-   npx ts-node .\loadFromS3ToPostgres.ts
-   ```
-10. Inside PostgreSQL, run the `views.sql` script located in `sql/views.sql` to create the views.
-11. Run the unit tests:
+10. Load the data from S3 to the local PostgreSQL database:
+    ```sh
+    npx ts-node .\loadFromS3ToPostgres.ts
+    ```
+11. Inside PostgreSQL, run the `views.sql` script located in `sql/views.sql` to create the views.
+12. Run the unit tests:
     ```sh
     npm run test
     ```

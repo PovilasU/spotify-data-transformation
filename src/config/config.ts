@@ -63,6 +63,7 @@ export const config = {
     minDuration: 60000, // 1 minute in milliseconds.
   },
 
-  //changeto true if dont want to load .csv files from aws s3 but test it with local files
-  localTest: process.env.LOCAL_TEST === "true",
+  //changeto true if dont want to load .csv files from aws s3 but instead  test it with local files from data folder
+
+  localTest: process.env.LOCAL_TEST === "false",
 };
