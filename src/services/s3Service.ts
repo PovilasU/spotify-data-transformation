@@ -1,6 +1,9 @@
+// src/services/s3Service.ts
 import AWS from "aws-sdk";
 import { config } from "../config/config";
 import { logger } from "../utils/logger";
+import fs from "fs";
+import path from "path";
 
 // Set up AWS S3 client
 const s3 = new AWS.S3({
@@ -12,18 +15,32 @@ const s3 = new AWS.S3({
 /**
  * Download CSV file from S3 and return its content as a string.
  * @param s3Key - The S3 key of the file to download.
+ *
  */
 export async function downloadCSVFromS3(s3Key: string): Promise<string> {
   try {
-    const params: AWS.S3.Types.GetObjectRequest = {
-      Bucket: config.aws.bucketName,
-      Key: s3Key,
-    };
-    const data = await s3.getObject(params).promise();
-    if (!data.Body) {
-      throw new Error("No file content from S3");
+    //to test localy if dont want to load .csv files from aws s3
+    if (process.env.LOCAL_TEST === "true") {
+      let filePath: string;
+      if (s3Key === "tracksFileKey") {
+        filePath = path.join(__dirname, "..", "data", "transformedTracks.csv");
+      } else if (s3Key === "artistsFileKey") {
+        filePath = path.join(__dirname, "..", "data", "transformedArtists.csv");
+      } else {
+        throw new Error("Unknown S3 key");
+      }
+      return fs.readFileSync(filePath, "utf8");
+    } else {
+      const params: AWS.S3.Types.GetObjectRequest = {
+        Bucket: config.aws.bucketName,
+        Key: s3Key,
+      };
+      const data = await s3.getObject(params).promise();
+      if (!data.Body) {
+        throw new Error("No file content from S3");
+      }
+      return data.Body.toString(); // Convert Buffer to string
     }
-    return data.Body.toString(); // Convert Buffer to string
   } catch (err) {
     logger.error("Error downloading CSV from S3: " + err);
     throw err;
