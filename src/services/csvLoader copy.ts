@@ -115,28 +115,15 @@ export async function loadCSVIntoTable(
     // Use CSV headers from the first record.
     const headers = Object.keys(records[0]);
 
-    // Validate required headers.
-    const requiredHeaders = ["id", "name"];
-    const missingHeaders = requiredHeaders.filter((h) => !headers.includes(h));
-    if (missingHeaders.length > 0) {
-      throw new Error(
-        `Missing required CSV headers for table "${tableName}": ${missingHeaders.join(
-          ", "
-        )}`
-      );
-    }
-
-    // Create table with columns using dynamic types via getColumnType.
-    const columnsDefinition = headers
-      .map((col) => `"${col}" ${getColumnType(col)}`)
-      .join(", ");
+    // Create table with columns as TEXT (if it doesn't exist)
+    const columnsDefinition = headers.map((col) => `"${col}" TEXT`).join(", ");
     const createTableQuery = `CREATE TABLE IF NOT EXISTS ${tableName} (${columnsDefinition});`;
     await pgClient.query(createTableQuery);
     logger.info(
       `Ensured table "${tableName}" exists with columns: ${headers.join(", ")}`
     );
 
-    // Prepare the INSERT query using dynamic placeholders.
+    // Prepare the INSERT query (using dynamic placeholders)
     const columnsList = headers.map((col) => `"${col}"`).join(", ");
     const placeholders = headers.map((_, i) => `$${i + 1}`).join(", ");
     const insertQuery = `INSERT INTO ${tableName} (${columnsList}) VALUES (${placeholders})`;
@@ -163,6 +150,5 @@ export async function loadCSVIntoTable(
     logger.info("Disconnected from PostgreSQL");
   } catch (err) {
     logger.error(`Error during CSV load into table "${tableName}": ${err}`);
-    throw err; // rethrow error so that the promise rejects
   }
 }

@@ -1,3 +1,5 @@
+// tests/loadFromS3ToPostgres.test.ts
+
 import { logger } from "../src/utils/logger";
 import { config } from "../src/config/config";
 
@@ -145,8 +147,7 @@ describe("ensureDatabaseExists", () => {
 // Tests for loadCSVIntoTable
 // --------------------
 describe("loadCSVIntoTable", () => {
-  // Use a valid CSV with required headers "id" and "name", plus an extra column.
-  const validCSV = "id,name,extra\n1,Test,abc";
+  const dummyCSV = "col1,col2\nval1,val2";
   const tableName = "test_table";
 
   beforeEach(() => {
@@ -161,30 +162,27 @@ describe("loadCSVIntoTable", () => {
     mockEnd.mockResolvedValue(undefined);
   });
 
-  it("should load CSV data into the specified table with proper types", async () => {
-    // Set up getObjectMock to return our valid CSV.
+  it("should load CSV data into the specified table", async () => {
+    // Set up getObjectMock to return our dummy CSV.
     getObjectMock.mockReturnValue({
-      promise: jest.fn().mockResolvedValue({ Body: Buffer.from(validCSV) }),
+      promise: jest.fn().mockResolvedValue({ Body: Buffer.from(dummyCSV) }),
     });
 
     await loadCSVIntoTable("dummyKey.csv", tableName);
 
-    // Check that the CREATE TABLE query uses dynamic column types.
-    // Expected types: "id" and "name" are TEXT, and "extra" defaults to TEXT.
+    // Check that one of the PG query calls contains the CREATE TABLE statement.
     const createTableCall = mockQuery.mock.calls.find((call) =>
       call[0].includes(`CREATE TABLE IF NOT EXISTS ${tableName}`)
     );
     expect(createTableCall).toBeDefined();
-    expect(createTableCall[0]).toContain(`"id" TEXT`);
-    expect(createTableCall[0]).toContain(`"name" TEXT`);
-    expect(createTableCall[0]).toContain(`"extra" TEXT`);
+    expect(createTableCall[1]).toBeUndefined();
 
-    // Check that an INSERT query was executed with the expected values.
+    // Check that one of the PG query calls is an INSERT statement with the expected values.
     const insertCall = mockQuery.mock.calls.find((call) =>
       call[0].includes(`INSERT INTO ${tableName}`)
     );
     expect(insertCall).toBeDefined();
-    expect(insertCall[1]).toEqual(["1", "Test", "abc"]);
+    expect(insertCall[1]).toEqual(expect.arrayContaining(["val1", "val2"]));
   });
 
   it("should log an error if CSV file is empty", async () => {
@@ -198,17 +196,6 @@ describe("loadCSVIntoTable", () => {
     await loadCSVIntoTable("dummyKey.csv", tableName);
     expect(loggerErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining(`CSV file for ${tableName} is empty.`)
-    );
-  });
-
-  it("should throw an error if required headers are missing", async () => {
-    // CSV missing the required "name" header.
-    const invalidCSV = "id,extra\n1,abc";
-    getObjectMock.mockReturnValue({
-      promise: jest.fn().mockResolvedValue({ Body: Buffer.from(invalidCSV) }),
-    });
-    await expect(loadCSVIntoTable("dummyKey.csv", tableName)).rejects.toThrow(
-      `Missing required CSV headers for table "${tableName}": name`
     );
   });
 });
