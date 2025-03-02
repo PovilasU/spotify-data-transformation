@@ -1,3 +1,4 @@
+//loadFromS3ToPostgres.ts
 import { loadCSVIntoTable } from "./services/csvLoader";
 import { config } from "./config/config";
 

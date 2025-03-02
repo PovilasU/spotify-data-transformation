@@ -69,6 +69,44 @@ function getColumnType(column: string): string {
 }
 
 /**
+ * Converts and validates a CSV value based on the expected column type.
+ * If the CSV field is an empty string, it will return null for non-TEXT types.
+ * Also, for array columns, it converts a JS-style string (e.g. "['a','b']")
+ * into a PostgreSQL array literal (e.g. "{a,b}").
+ */
+function convertValue(value: string, column: string): any {
+  const type = getColumnType(column);
+  // For array columns, convert the value format.
+  if (value && (column === "id_artists" || column === "genres")) {
+    // Convert a string like "['45tIt06XoI0Iio4LBEVpls']" to "{45tIt06XoI0Iio4LBEVpls}"
+    value = value.replace(/^\s*\[\s*/, "{").replace(/\s*\]\s*$/, "}");
+    value = value.replace(/'/g, "");
+    return value;
+  }
+  // For non-text types, empty strings should be treated as null.
+  if (value === "") {
+    return null;
+  }
+  // Convert based on the expected type.
+  if (type === "INTEGER") {
+    const intVal = parseInt(value, 10);
+    return isNaN(intVal) ? null : intVal;
+  }
+  if (type === "DOUBLE PRECISION") {
+    const floatVal = parseFloat(value);
+    return isNaN(floatVal) ? null : floatVal;
+  }
+  if (type === "BOOLEAN") {
+    const lowerVal = value.toLowerCase();
+    if (lowerVal === "true" || value === "1") return true;
+    if (lowerVal === "false" || value === "0") return false;
+    return null;
+  }
+  // For TEXT (and any unhandled types), return the value as is.
+  return value;
+}
+
+/**
  * Load a CSV file (from S3) into a PostgreSQL table.
  * @param s3Key - The S3 key for the CSV file.
  * @param tableName - The target table name.
@@ -153,7 +191,10 @@ export async function loadCSVIntoTable(
 
     // Insert each record one by one.
     for (const record of records) {
-      const values = headers.map((header) => record[header] ?? null);
+      const values = headers.map((header) => {
+        const rawValue = record[header] ?? "";
+        return convertValue(rawValue, header);
+      });
       await pgClient.query(insertQuery, values);
       progressBar.increment();
     }
