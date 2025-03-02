@@ -42,10 +42,22 @@ export const config = {
     artists: "transformedArtists.csv",
   },
   files: {
-    tracksInput: path.join(__dirname, "..", "data", "tracks.csv"),
-    artistsInput: path.join(__dirname, "..", "data", "artists.csv"),
-    tracksOutput: path.join(__dirname, "..", "data", "transformedTracks.csv"),
-    artistsOutput: path.join(__dirname, "..", "data", "transformedArtists.csv"),
+    tracksInput: path.join(__dirname, "..", "..", "data", "tracks.csv"),
+    artistsInput: path.join(__dirname, "..", "..", "data", "artists.csv"),
+    tracksOutput: path.join(
+      __dirname,
+      "..",
+      "..",
+      "data",
+      "transformedTracks.csv"
+    ),
+    artistsOutput: path.join(
+      __dirname,
+      "..",
+      "..",
+      "data",
+      "transformedArtists.csv"
+    ),
   },
   transform: {
     minDuration: 60000, // 1 minute in milliseconds.
