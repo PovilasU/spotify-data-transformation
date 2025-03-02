@@ -11,6 +11,7 @@ This project involves the ingestion, transformation, and analysis of Spotify sam
 - Spotify sample datasets:
   - [Artists Dataset](https://www.kaggle.com/datasets/yamaerenay/spotify-dataset-19212020-600k-tracks?select=artists.csv)
   - [Tracks Dataset](https://www.kaggle.com/datasets/yamaerenay/spotify-dataset-19212020-600k-tracks?select=tracks.csv)
+- Place these files into the `data` folder as `artists.csv` and `tracks.csv`.
 
 ### Data Transformation
 
