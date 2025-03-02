@@ -12,25 +12,43 @@ const s3 = new AWS.S3({
   region: config.aws.region,
 });
 
+const tracksFileKey = "transformedTracks.csv";
+const artistsFileKey = "transformedArtists.csv";
+
 /**
  * Download CSV file from S3 and return its content as a string.
  * @param s3Key - The S3 key of the file to download.
  *
  */
+
 export async function downloadCSVFromS3(s3Key: string): Promise<string> {
   try {
-    //to test localy if dont want to load .csv files from aws s3
+    // For simplicity, we assume local files if LOCAL_TEST is true.
     if (process.env.LOCAL_TEST === "true") {
       let filePath: string;
-      if (s3Key === "tracksFileKey") {
-        filePath = path.join(__dirname, "..", "data", "transformedTracks.csv");
-      } else if (s3Key === "artistsFileKey") {
-        filePath = path.join(__dirname, "..", "data", "transformedArtists.csv");
+      if (s3Key === tracksFileKey) {
+        filePath = path.join(
+          __dirname,
+          "..",
+          "..",
+          "data",
+          "transformedTracks.csv"
+        );
+      } else if (s3Key === artistsFileKey) {
+        filePath = path.join(
+          __dirname,
+          "..",
+          "..",
+          "data",
+          "transformedArtists.csv"
+        );
       } else {
-        throw new Error("Unknown S3 key");
+        throw new Error(`Local file for key "${s3Key}" is not configured.`);
       }
-      return fs.readFileSync(filePath, "utf8");
+      logger.info(`Reading CSV from local file: ${filePath}`);
+      return await fs.promises.readFile(filePath, "utf-8");
     } else {
+      logger.info(`Downloading CSV from S3 key: ${s3Key}`);
       const params: AWS.S3.Types.GetObjectRequest = {
         Bucket: config.aws.bucketName,
         Key: s3Key,
@@ -39,10 +57,10 @@ export async function downloadCSVFromS3(s3Key: string): Promise<string> {
       if (!data.Body) {
         throw new Error("No file content from S3");
       }
-      return data.Body.toString(); // Convert Buffer to string
+      return data.Body.toString();
     }
   } catch (err) {
-    logger.error("Error downloading CSV from S3: " + err);
+    logger.error(`Error downloading CSV for key "${s3Key}": ${err}`);
     throw err;
   }
 }
