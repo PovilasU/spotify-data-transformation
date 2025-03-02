@@ -6,10 +6,10 @@ SELECT
   t.popularity,
   t.energy,
   t.danceability_level AS danceability,
-  COALESCE(SUM(CAST(NULLIF(a.followers, '') AS NUMERIC)), 0) AS artist_followers
+  COALESCE(SUM(a.followers), 0) AS artist_followers
 FROM tracks t
 LEFT JOIN LATERAL (
-  SELECT TRIM(unnest(string_to_array(regexp_replace(t.id_artists, E'[\\[\\]\'"]', '', 'g'), ','))) AS artist_id
+  SELECT TRIM(unnest(string_to_array(regexp_replace(array_to_string(t.id_artists, ','), E'[\\[\\]\'"]', '', 'g'), ','))) AS artist_id
 ) AS u ON true
 LEFT JOIN artists a ON a.id = u.artist_id
 GROUP BY t.id, t.name, t.popularity, t.energy, t.danceability_level;
@@ -42,7 +42,7 @@ SELECT
   t.name AS track_name
 FROM tracks t
 JOIN LATERAL (
-  SELECT TRIM(unnest(string_to_array(regexp_replace(t.id_artists, E'[\\[\\]\'"]', '', 'g'), ','))) AS artist_id
+  SELECT TRIM(unnest(string_to_array(regexp_replace(array_to_string(t.id_artists, ','), E'[\\[\\]\'"]', '', 'g'), ','))) AS artist_id
 ) AS u ON true
 JOIN artists a ON a.id = u.artist_id
-WHERE COALESCE(NULLIF(a.followers, ''), '0')::numeric > 0;
+WHERE COALESCE(a.followers, 0) > 0;

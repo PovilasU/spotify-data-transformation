@@ -1,4 +1,3 @@
-// loadFromS3ToPostgres.ts
 import AWS from "aws-sdk";
 import { Client } from "pg";
 import path from "path";
@@ -237,7 +236,7 @@ export async function loadCSVIntoTable(
       logger.error(
         `Error parsing CSV file for table "${tableName}": ${parseErr}`
       );
-      throw parseErr;
+      throw new Error(`Error parsing CSV file for table "${tableName}"`);
     }
 
     if (records.length === 0) {
@@ -374,6 +373,7 @@ export async function loadCSVIntoTable(
     logger.info("Disconnected from PostgreSQL");
   } catch (err) {
     logger.error(`Error during CSV load into table "${tableName}": ${err}`);
+    throw err;
   }
 }
 
