@@ -169,7 +169,7 @@ export async function loadCSVIntoTable(
 
 // Run the pipelines to load both tracks and artists CSV files.
 async function runLoads() {
-  await loadCSVIntoTable(tracksFileKey, "tracks");
+  // await loadCSVIntoTable(tracksFileKey, "tracks");
   await loadCSVIntoTable(artistsFileKey, "artists");
 }
 
