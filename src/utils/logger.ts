@@ -17,6 +17,7 @@ export const logger = createLogger({
       filename: path.join(
         __dirname,
         "..",
+        "..",
         "logs",
         `app-error-${currentDate}.log`
       ),
