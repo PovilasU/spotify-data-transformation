@@ -6,7 +6,7 @@ import { parse } from "csv-parse/sync";
 import cliProgress from "cli-progress";
 import { logger } from "./utils/logger";
 import { ensureDatabaseExists, getClient } from "./db";
-import { config } from "./config";
+import { config } from "./config/config";
 
 // Load environment variables (already loaded in config.ts, but in case you run this file standalone)
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") });

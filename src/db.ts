@@ -1,5 +1,5 @@
 import { Client } from "pg";
-import { config } from "./config";
+import { config } from "./config/config";
 import { logger } from "./utils/logger";
 
 /**

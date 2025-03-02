@@ -1,6 +1,6 @@
 import path from "path";
 import { logger } from "./utils/logger";
-import { config } from "./config";
+import { config } from "./config/config";
 import {
   FilterTransform,
   ArtistFilterTransform,

@@ -1,7 +1,7 @@
 import AWS from "aws-sdk";
 import fs from "fs";
 import path from "path";
-import { config } from "./config";
+import { config } from "./config/config";
 import { logger } from "./utils/logger";
 
 const s3 = new AWS.S3({

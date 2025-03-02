@@ -5,7 +5,7 @@ import cliProgress from "cli-progress";
 import { Transform, TransformCallback } from "stream";
 import { pipeline } from "stream/promises";
 import { logger } from "./utils/logger";
-import { config } from "./config";
+import { config } from "./config/config";
 
 // Define interfaces for input track rows and artist rows.
 export interface TrackRow {
