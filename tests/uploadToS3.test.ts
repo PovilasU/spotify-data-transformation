@@ -20,7 +20,7 @@ jest.resetModules();
 
 import path from "path";
 import { promises as fsPromises } from "fs";
-import { logger } from "../src/logger";
+import { logger } from "../src/utils/logger";
 import { uploadFileToS3 } from "../src/uploadToS3";
 import AWS from "aws-sdk";
 
