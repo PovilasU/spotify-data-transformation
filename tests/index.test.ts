@@ -1,7 +1,7 @@
 // tests/index.test.ts
 
-import { config } from "../src/config";
-import { logger } from "../src/logger";
+import { config } from "../src/config/config";
+import { logger } from "../src/utils/logger";
 
 // Mock the transformer module to control behavior of processCSV, FilterTransform, and ArtistFilterTransform.
 jest.mock("../src/transformer", () => {
@@ -26,7 +26,7 @@ import {
 } from "../src/transformer";
 
 // Mock the logger to capture logs.
-jest.mock("../src/logger", () => {
+jest.mock("../src/utils/logger", () => {
   return {
     logger: {
       info: jest.fn(),

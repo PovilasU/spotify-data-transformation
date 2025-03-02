@@ -6,18 +6,14 @@ import path from "path";
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 
-// --- Mock AWS S3 for tests ---
-jest.mock("aws-sdk", () => {
-  return {
-    S3: jest.fn(() => ({
-      getObject: jest.fn().mockReturnValue({
-        promise: jest.fn().mockResolvedValue({
-          Body: Buffer.from("id,name\n1,S3Test"),
-        }),
-      }),
-    })),
-  };
-});
+// Ensure that the S3 prototype has a getObject method
+if (!AWS.S3.prototype.getObject) {
+  AWS.S3.prototype.getObject = jest.fn().mockReturnValue({
+    promise: jest
+      .fn()
+      .mockResolvedValue({ Body: Buffer.from("id,name\n1,Test") }),
+  });
+}
 
 // Helper function to download CSV (as in your code)
 async function downloadCSV(fileName: string): Promise<string> {
@@ -54,10 +50,29 @@ describe("downloadCSV", () => {
 
   test("downloads from S3 when LOCAL_TEST is not true", async () => {
     process.env.LOCAL_TEST = "false";
-    // Spy on the prototype method so that any instance's getObject is tracked.
+
+    // Spy on the getObject method
     const getObjectSpy = jest.spyOn(AWS.S3.prototype, "getObject");
+
+    // Call the function that downloads the CSV from S3.
     const csv = await downloadCSV("transformedTracks.csv");
+
+    // Verify that getObject was called and the CSV contains expected header.
     expect(getObjectSpy).toHaveBeenCalled();
     expect(csv).toContain("id,name");
   });
+});
+
+test("downloads from S3 when LOCAL_TEST is not true", async () => {
+  process.env.LOCAL_TEST = "false";
+
+  // Spy on the getObject method
+  const getObjectSpy = jest.spyOn(AWS.S3.prototype, "getObject");
+
+  // Call the function that downloads the CSV from S3.
+  const csv = await downloadCSV("transformedTracks.csv");
+
+  // Verify that getObject was called and the CSV contains expected header.
+  expect(getObjectSpy).toHaveBeenCalled();
+  expect(csv).toContain("id,name");
 });

@@ -81,7 +81,7 @@ This project involves the ingestion, transformation, and analysis of Spotify sam
    ```sh
    npx ts-node .\loadFromS3ToPostgres.ts
    ```
-10. Inside PostgreSQL, run the `views.sql` script to create the views.
+10. Inside PostgreSQL, run the `views.sql` script located in `sql/views.sql` to create the views.
 11. Run the unit tests:
     ```sh
     npm run test

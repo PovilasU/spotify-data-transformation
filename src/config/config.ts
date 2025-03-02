@@ -41,13 +41,6 @@ export const config = {
     tracks: "transformedTracks.csv",
     artists: "transformedArtists.csv",
   },
-  pg: {
-    host: process.env.PG_HOST!,
-    port: parseInt(process.env.PG_PORT || "5432"),
-    user: process.env.PG_USER!,
-    password: process.env.PG_PASSWORD!,
-    database: process.env.PG_DATABASE!,
-  },
   files: {
     tracksInput: path.join(__dirname, "..", "data", "tracks.csv"),
     artistsInput: path.join(__dirname, "..", "data", "artists.csv"),

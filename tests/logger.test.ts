@@ -1,6 +1,6 @@
 // tests/logger.test.ts
 import path from "path";
-import { logger } from "../src/logger";
+import { logger } from "../src/utils/logger";
 import { transports } from "winston";
 
 describe("Logger configuration", () => {
