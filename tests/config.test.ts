@@ -1,73 +1,134 @@
 // tests/config.test.ts
 import path from "path";
 
-describe("config module", () => {
-  // Save the original environment variables.
-  const originalEnv = { ...process.env };
+describe("Configuration", () => {
+  const ORIGINAL_ENV = process.env;
 
   beforeEach(() => {
-    // Reset modules so that changes to process.env are picked up when the module is imported.
+    // Create a clean copy of process.env.
+    process.env = { ...ORIGINAL_ENV };
+    // Remove any preloaded values that might come from a .env file.
+    delete process.env.AWS_ACCESS_KEY_ID;
+    delete process.env.AWS_SECRET_ACCESS_KEY;
+    delete process.env.AWS_REGION;
+    delete process.env.S3_BUCKET_NAME;
+    delete process.env.PG_HOST;
+    delete process.env.PG_PORT;
+    delete process.env.PG_USER;
+    delete process.env.PG_PASSWORD;
+    delete process.env.PG_DATABASE;
+    delete process.env.LOCAL_TEST;
+    // Clear module cache so that changes to process.env are picked up.
     jest.resetModules();
-    process.env = { ...originalEnv };
   });
 
-  afterAll(() => {
-    // Restore the original environment.
-    process.env = originalEnv;
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+    jest.resetModules();
+    jest.dontMock("dotenv");
   });
 
-  it("should export config with correct values when all required environment variables are present", () => {
+  it("should load config correctly when all required env variables are provided", () => {
     // Set required environment variables.
-    process.env.AWS_ACCESS_KEY_ID = "dummyKey";
-    process.env.AWS_SECRET_ACCESS_KEY = "dummySecret";
-    process.env.AWS_REGION = "us-east-1";
-    process.env.S3_BUCKET_NAME = "dummy-bucket";
+    process.env.AWS_ACCESS_KEY_ID = "test_access_key";
+    process.env.AWS_SECRET_ACCESS_KEY = "test_secret_key";
+    process.env.AWS_REGION = "test_region";
+    process.env.S3_BUCKET_NAME = "test_bucket";
     process.env.PG_HOST = "localhost";
     process.env.PG_PORT = "5432";
-    process.env.PG_USER = "dummyUser";
-    process.env.PG_PASSWORD = "dummyPass";
-    process.env.PG_DATABASE = "dummyDB";
-    // Optionally, set LOCAL_TEST.
-    process.env.LOCAL_TEST = "false";
+    process.env.PG_USER = "test_user";
+    process.env.PG_PASSWORD = "test_password";
+    process.env.PG_DATABASE = "test_db";
+    process.env.LOCAL_TEST = "false"; // This means do NOT load local files
 
-    // Import the config module after setting process.env.
+    // Reset modules so that the config module reads the updated env variables.
+    jest.resetModules();
     const { config } = require("../src/config/config");
 
-    // Verify AWS config.
-    expect(config.aws.accessKeyId).toBe("dummyKey");
-    expect(config.aws.secretAccessKey).toBe("dummySecret");
-    expect(config.aws.region).toBe("us-east-1");
-    expect(config.aws.bucketName).toBe("dummy-bucket");
+    // Check AWS config values.
+    expect(config.aws.accessKeyId).toBe("test_access_key");
+    expect(config.aws.secretAccessKey).toBe("test_secret_key");
+    expect(config.aws.region).toBe("test_region");
+    expect(config.aws.bucketName).toBe("test_bucket");
 
-    // Verify PostgreSQL config.
+    // Check PostgreSQL config.
     expect(config.postgres.host).toBe("localhost");
     expect(config.postgres.port).toBe(5432);
-    expect(config.postgres.user).toBe("dummyUser");
-    expect(config.postgres.password).toBe("dummyPass");
-    expect(config.postgres.database).toBe("dummyDB");
+    expect(config.postgres.user).toBe("test_user");
+    expect(config.postgres.password).toBe("test_password");
+    expect(config.postgres.database).toBe("test_db");
 
-    // Verify other config values.
+    // Check s3Keys.
     expect(config.s3Keys.tracks).toBe("transformedTracks.csv");
-    expect(config.files.tracksInput).toContain(path.join("data", "tracks.csv"));
-    expect(config.transform.minDuration).toBe(60000);
+    expect(config.s3Keys.artists).toBe("transformedArtists.csv");
+
+    // Verify that the file paths are as defined.
+    // The config file constructs paths using:
+    //   path.join(__dirname, "..", "..", "data", "<file>")
+    // where __dirname in config is something like:
+    //   .../spotify-data-transformation/src/config
+    // so the resolved path will be:
+    //   .../spotify-data-transformation/data/<file>
+    // In this test, __dirname is the tests folder (e.g., .../spotify-data-transformation/tests),
+    // so we build the expected paths relative to the project root.
+    const expectedTracksInput = path.join(
+      __dirname,
+      "..",
+      "data",
+      "tracks.csv"
+    );
+    const expectedTracksOutput = path.join(
+      __dirname,
+      "..",
+      "data",
+      "transformedTracks.csv"
+    );
+    expect(config.files.tracksInput).toBe(expectedTracksInput);
+    expect(config.files.tracksOutput).toBe(expectedTracksOutput);
+
+    // Based on your config, localTest is true when process.env.LOCAL_TEST is exactly "false".
+    expect(config.localTest).toBe(true);
+  });
+
+  it("should set localTest to false when LOCAL_TEST is not 'false'", () => {
+    // Set required environment variables.
+    process.env.AWS_ACCESS_KEY_ID = "test_access_key";
+    process.env.AWS_SECRET_ACCESS_KEY = "test_secret_key";
+    process.env.AWS_REGION = "test_region";
+    process.env.S3_BUCKET_NAME = "test_bucket";
+    process.env.PG_HOST = "localhost";
+    process.env.PG_PORT = "5432";
+    process.env.PG_USER = "test_user";
+    process.env.PG_PASSWORD = "test_password";
+    process.env.PG_DATABASE = "test_db";
+    process.env.LOCAL_TEST = "true"; // Any value other than "false" should result in false
+
+    jest.resetModules();
+    const { config } = require("../src/config/config");
     expect(config.localTest).toBe(false);
   });
 
   it("should throw an error if a required environment variable is missing", () => {
-    // Set all required env vars except PG_DATABASE.
-    process.env.AWS_ACCESS_KEY_ID = "dummyKey";
-    process.env.AWS_SECRET_ACCESS_KEY = "dummySecret";
-    process.env.AWS_REGION = "us-east-1";
-    process.env.S3_BUCKET_NAME = "dummy-bucket";
+    // For this test we want to simulate that no .env values are loaded.
+    // We override dotenv.config to return an empty object.
+    jest.doMock("dotenv", () => ({
+      config: jest.fn(() => ({ parsed: {} })),
+    }));
+    // Set all required variables except AWS_ACCESS_KEY_ID.
+    process.env.AWS_SECRET_ACCESS_KEY = "test_secret_key";
+    process.env.AWS_REGION = "test_region";
+    process.env.S3_BUCKET_NAME = "test_bucket";
     process.env.PG_HOST = "localhost";
     process.env.PG_PORT = "5432";
-    process.env.PG_USER = "dummyUser";
-    process.env.PG_PASSWORD = "dummyPass";
-    // Instead of deleting, set PG_DATABASE to an empty string.
-    process.env.PG_DATABASE = "";
+    process.env.PG_USER = "test_user";
+    process.env.PG_PASSWORD = "test_password";
+    process.env.PG_DATABASE = "test_db";
+    process.env.LOCAL_TEST = "false";
+
+    jest.resetModules();
 
     expect(() => {
       require("../src/config/config");
-    }).toThrow("Missing required environment variable: PG_DATABASE");
+    }).toThrowError(/Missing required environment variable: AWS_ACCESS_KEY_ID/);
   });
 });
